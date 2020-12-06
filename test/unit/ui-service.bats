@@ -210,6 +210,16 @@ load _helpers
       --set 'server.ha.enabled=true' \
       --set 'ui.serviceType=LoadBalancer' \
       --set 'ui.enabled=true' \
+      --set 'ui.annotations.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.annotations["foo"]' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+
+  local actual=$(helm template \
+      --show-only templates/ui-service.yaml  \
+      --set 'server.ha.enabled=true' \
+      --set 'ui.serviceType=LoadBalancer' \
+      --set 'ui.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.metadata.annotations["foo"]' | tee /dev/stderr)
   [ "${actual}" = "null" ]
@@ -237,4 +247,56 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.ports[0].name' | tee /dev/stderr)
   [ "${actual}" = "https" ]
+}
+
+@test "ui/Service: publishNotReadyAddresses set true by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      --show-only templates/ui-service.yaml  \
+      --set 'ui.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.publishNotReadyAddresses' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "ui/Service: publishNotReadyAddresses can be set to false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      --show-only templates/ui-service.yaml  \
+      --set 'ui.enabled=true' \
+      --set 'ui.publishNotReadyAddresses=false' \
+      . | tee /dev/stderr |
+      yq -r '.spec.publishNotReadyAddresses' | tee /dev/stderr)
+  [ "${actual}" = 'false' ]
+}
+
+@test "ui/Service: active pod only selector not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      --show-only templates/ui-service.yaml  \
+      --set 'ui.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.selector["vault-active"]' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "ui/Service: active pod only selector can be set on HA" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      --show-only templates/ui-service.yaml  \
+      --set 'ui.enabled=true' \
+      --set 'ui.activeVaultPodOnly=true' \
+      --set 'server.dev.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.selector["vault-active"]' | tee /dev/stderr)
+  [ "${actual}" = 'null' ]
+
+  local actual=$(helm template \
+      --show-only templates/ui-service.yaml  \
+      --set 'ui.enabled=true' \
+      --set 'ui.activeVaultPodOnly=true' \
+      --set 'server.ha.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.selector["vault-active"]' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
 }
